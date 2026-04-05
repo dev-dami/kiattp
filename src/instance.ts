@@ -6,6 +6,7 @@ import type {
   RequestFn,
   Interceptors,
   HttpMethod,
+  HttpError,
 } from "./types";
 import { request, globalChain } from "./core/request";
 import { InterceptorChain } from "./interceptors/chain";
@@ -32,7 +33,7 @@ export function createInstance(defaults?: Partial<Config>): Instance {
       validateStatus: instanceConfig.validateStatus,
       onUploadProgress: instanceConfig.onUploadProgress,
       onDownloadProgress: instanceConfig.onDownloadProgress,
-    });
+    }, instanceChain);
   };
 
   const methodFn = (method: HttpMethod): RequestFn => {
@@ -41,13 +42,19 @@ export function createInstance(defaults?: Partial<Config>): Instance {
 
   const interceptors: Interceptors = {
     request: {
-      use: (onFulfilled) => {
+      use: (onFulfilled, onRejected) => {
         instanceChain.addRequest(onFulfilled);
+        if (onRejected) {
+          instanceChain.addError(onRejected as (error: HttpError) => HttpError | Promise<HttpError>);
+        }
       },
     },
     response: {
-      use: (onFulfilled) => {
+      use: (onFulfilled, onRejected) => {
         instanceChain.addResponse(onFulfilled);
+        if (onRejected) {
+          instanceChain.addError(onRejected as (error: HttpError) => HttpError | Promise<HttpError>);
+        }
       },
     },
   };
@@ -55,11 +62,7 @@ export function createInstance(defaults?: Partial<Config>): Instance {
   const use = (plugin: Plugin) => {
     if (plugin.onRequest) instanceChain.addRequest(plugin.onRequest);
     if (plugin.onResponse) instanceChain.addResponse(plugin.onResponse);
-    if (plugin.onError) {
-      console.warn(
-        `Plugin "${plugin.name}" provides onError but error interceptors are not yet supported`,
-      );
-    }
+    if (plugin.onError) instanceChain.addError(plugin.onError);
   };
 
   return {
@@ -80,9 +83,5 @@ export function createInstance(defaults?: Partial<Config>): Instance {
 export function use(plugin: Plugin): void {
   if (plugin.onRequest) globalChain.addRequest(plugin.onRequest);
   if (plugin.onResponse) globalChain.addResponse(plugin.onResponse);
-  if (plugin.onError) {
-    console.warn(
-      `Plugin "${plugin.name}" provides onError but error interceptors are not yet supported`,
-    );
-  }
+  if (plugin.onError) globalChain.addError(plugin.onError);
 }

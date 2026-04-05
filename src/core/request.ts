@@ -21,6 +21,7 @@ export const globalChain = new InterceptorChain();
 export async function request<T = unknown>(
   url: string,
   config?: Omit<Config, "url">,
+  errorChain?: InterceptorChain,
 ): Promise<Response<T>> {
   let resolvedConfig = normalizeConfig({ ...config, url });
   const fullUrl = buildUrl(resolvedConfig);
@@ -90,7 +91,11 @@ export async function request<T = unknown>(
           validateStatus: resolvedConfig.validateStatus,
           onUploadProgress: resolvedConfig.onUploadProgress,
           onDownloadProgress: resolvedConfig.onDownloadProgress,
-        });
+        }, errorChain);
+      }
+      if (errorChain) {
+        const processedError = await errorChain.runError(err as HttpError);
+        throw processedError;
       }
       throw err;
     }
@@ -104,6 +109,10 @@ export async function request<T = unknown>(
         config: resolvedConfig,
       },
     );
+    if (errorChain) {
+      const processedError = await errorChain.runError(error as unknown as HttpError);
+      throw processedError;
+    }
     throw error;
   }
 }
