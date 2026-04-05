@@ -88,6 +88,8 @@ export async function request<T = unknown>(
           signal: resolvedConfig.signal,
           responseType: resolvedConfig.responseType,
           validateStatus: resolvedConfig.validateStatus,
+          onUploadProgress: resolvedConfig.onUploadProgress,
+          onDownloadProgress: resolvedConfig.onDownloadProgress,
         });
       }
       throw err;

@@ -7,10 +7,16 @@ export type {
   ResponseType,
   Interceptors,
   Instance,
+  BodyType,
+  ProgressEvent,
+  ProgressCallback,
 } from './types';
 
 export { request } from './core/request';
 export { createInstance, use } from './instance';
+export { retry_plugin } from './plugins/retry';
+export { logger_plugin } from './plugins/logger';
+export { timeout_plugin } from './plugins/timeout';
 
 import type { Config } from './types';
 import { request } from './core/request';

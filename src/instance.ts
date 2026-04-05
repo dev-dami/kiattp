@@ -30,6 +30,8 @@ export function createInstance(defaults?: Partial<Config>): Instance {
       signal: instanceConfig.signal,
       responseType: instanceConfig.responseType,
       validateStatus: instanceConfig.validateStatus,
+      onUploadProgress: instanceConfig.onUploadProgress,
+      onDownloadProgress: instanceConfig.onDownloadProgress,
     });
   };
 

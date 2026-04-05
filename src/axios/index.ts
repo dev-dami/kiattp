@@ -1,4 +1,4 @@
-import type { Config, Response, HttpError, Plugin } from '../types';
+import type { Config, Response, HttpError, Plugin, BodyType } from '../types';
 import { createInstance as createKiaInstance } from '../instance';
 import { CancelToken, isCancel } from './cancel';
 
@@ -9,9 +9,10 @@ interface AxiosConfig extends Config {
 
 function toKiaConfig(config: AxiosConfig): Omit<Config, 'url'> {
   const { data, cancelToken, ...rest } = config;
+  const bodyValue: BodyType = (data as BodyType) ?? rest.body;
   const kiaConfig: Omit<Config, 'url'> = {
     ...rest,
-    body: data ?? rest.body,
+    body: bodyValue,
   };
   return kiaConfig;
 }
