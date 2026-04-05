@@ -1,0 +1,50 @@
+{
+  "name": "kiattp",
+  "version": "0.1.0",
+  "description": "A zero-dependency, fast, lightweight HTTP client library",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./axios": {
+      "types": "./dist/axios.d.ts",
+      "import": "./dist/axios.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench --run",
+    "size": "node scripts/size-check.mjs",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "http",
+    "https",
+    "fetch",
+    "axios",
+    "request",
+    "client"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "axios": "^1.7.0",
+    "msw": "^2.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
