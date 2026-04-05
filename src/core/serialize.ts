@@ -1,9 +1,9 @@
-import type { ResponseType } from "../types";
+import type { BodyType, ResponseType } from "../types";
 
 const NO_BODY_METHODS = new Set(["GET", "HEAD"]);
 
 export function serializeBody(
-  body: unknown,
+  body: BodyType,
   headers: Record<string, string>,
   method?: string,
 ): BodyInit | undefined {
@@ -16,10 +16,30 @@ export function serializeBody(
   }
 
   if (typeof FormData !== "undefined" && body instanceof FormData) {
+    // Don't set Content-Type for FormData; the browser sets the boundary
     return body;
   }
 
   if (body instanceof URLSearchParams) {
+    if (!headers["content-type"]) {
+      headers["content-type"] = "application/x-www-form-urlencoded";
+    }
+    return body;
+  }
+
+  if (typeof Blob !== "undefined" && body instanceof Blob) {
+    return body;
+  }
+
+  if (body instanceof ArrayBuffer) {
+    return body;
+  }
+
+  if (ArrayBuffer.isView(body)) {
+    return body as BodyInit;
+  }
+
+  if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) {
     return body;
   }
 
@@ -40,23 +60,59 @@ export function serializeBody(
   }
 }
 
+type FetchResponse = globalThis.Response;
+
 export async function parseResponse(
-  bodyText: string,
+  bodySource: FetchResponse | string | ReadableStream | null,
   _headers: Record<string, string>,
   responseType?: ResponseType,
 ): Promise<unknown> {
-  if (!bodyText) {
+  if (!bodySource) {
     return null;
   }
 
-  if (responseType === "text") {
-    return bodyText;
+  // Handle fetch Response objects
+  if (bodySource instanceof globalThis.Response) {
+    const resp = bodySource as FetchResponse;
+    switch (responseType) {
+      case "blob":
+        return resp.blob();
+      case "arraybuffer":
+        return resp.arrayBuffer();
+      case "stream":
+        return resp.body;
+      case "text":
+        return resp.text();
+      case "json":
+      default: {
+        const text = await resp.text();
+        if (!text) return null;
+        try {
+          return JSON.parse(text);
+        } catch {
+          return text;
+        }
+      }
+    }
   }
 
-  // def: try JSON, fall back text
-  try {
-    return JSON.parse(bodyText);
-  } catch {
-    return bodyText;
+  // Handle string body (from Node.js http adapter or fallback)
+  if (typeof bodySource === "string") {
+    if (!bodySource) return null;
+    if (responseType === "text") {
+      return bodySource;
+    }
+    if (responseType === "arraybuffer") {
+      return new TextEncoder().encode(bodySource).buffer;
+    }
+
+    // def: try JSON, fall back text
+    try {
+      return JSON.parse(bodySource);
+    } catch {
+      return bodySource;
+    }
   }
+
+  return bodySource;
 }
