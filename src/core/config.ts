@@ -12,15 +12,23 @@ export function normalizeConfig(
   callConfig: Partial<Config>,
   instanceDefaults?: Partial<Config>,
 ): Config {
+  // Deep merge headers to preserve instance defaults
+  const mergedHeaders: Record<string, string> = {
+    ...(instanceDefaults?.headers || {}),
+    ...(callConfig.headers || {}),
+  };
+
   const merged: Config = {
     ...defaultConfig(),
     ...instanceDefaults,
     ...callConfig,
+    headers: mergedHeaders,
   };
   const config: Config = { ...merged };
-  const headers: Record<string, string> = { ...merged.headers };
+
+  // Normalize header keys to lowercase
   const normalizedHeaders: Record<string, string> = {};
-  for (const [key, value] of Object.entries(headers)) {
+  for (const [key, value] of Object.entries(config.headers || {})) {
     normalizedHeaders[key.toLowerCase()] = value;
   }
   config.headers = normalizedHeaders;

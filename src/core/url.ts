@@ -4,22 +4,39 @@ function isAbsoluteUrl(url: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(url);
 }
 
+function ensureTrailingSlash(url: string): string {
+  return url.endsWith("/") ? url : url + "/";
+}
+
+function stripLeadingSlash(path: string): string {
+  return path.startsWith("/") ? path.slice(1) : path;
+}
+
 export function buildUrl(
   config: Pick<Config, "baseURL" | "url" | "params">,
 ): string {
   let url = "";
 
   if (config.baseURL) {
-    url = config.baseURL;
+    // Strip trailing slash from baseURL to avoid double slashes
+    url = config.baseURL.endsWith("/")
+      ? config.baseURL.slice(0, -1)
+      : config.baseURL;
   }
 
   if (config.url) {
     if (isAbsoluteUrl(config.url)) {
+      // Absolute URLs override baseURL completely
       url = config.url;
     } else {
-      const base = url.endsWith("/") ? url.slice(0, -1) : url;
+      // Relative path: combine baseURL and url
+      const baseURL = config.baseURL
+        ? config.baseURL.endsWith("/")
+          ? config.baseURL.slice(0, -1)
+          : config.baseURL
+        : "";
       const path = config.url.startsWith("/") ? config.url : "/" + config.url;
-      url = base + path;
+      url = baseURL + path;
     }
   }
 
