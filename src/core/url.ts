@@ -4,21 +4,24 @@ function isAbsoluteUrl(url: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(url);
 }
 
-function ensureTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url : url + "/";
-}
-
-function stripLeadingSlash(path: string): string {
-  return path.startsWith("/") ? path.slice(1) : path;
+function defaultSerializeParams(
+  params: Record<string, string | number | boolean | null | undefined>,
+): string {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null && value !== undefined) {
+      searchParams.append(key, String(value));
+    }
+  }
+  return searchParams.toString().replace(/\+/g, "%20");
 }
 
 export function buildUrl(
-  config: Pick<Config, "baseURL" | "url" | "params">,
+  config: Pick<Config, "baseURL" | "url" | "params" | "paramsSerializer">,
 ): string {
   let url = "";
 
   if (config.baseURL) {
-    // Strip trailing slash from baseURL to avoid double slashes
     url = config.baseURL.endsWith("/")
       ? config.baseURL.slice(0, -1)
       : config.baseURL;
@@ -26,10 +29,8 @@ export function buildUrl(
 
   if (config.url) {
     if (isAbsoluteUrl(config.url)) {
-      // Absolute URLs override baseURL completely
       url = config.url;
     } else {
-      // Relative path: combine baseURL and url
       const baseURL = config.baseURL
         ? config.baseURL.endsWith("/")
           ? config.baseURL.slice(0, -1)
@@ -41,13 +42,9 @@ export function buildUrl(
   }
 
   if (config.params && Object.keys(config.params).length > 0) {
-    const searchParams = new URLSearchParams();
-    for (const [key, value] of Object.entries(config.params)) {
-      if (value !== null && value !== undefined) {
-        searchParams.append(key, String(value));
-      }
-    }
-    const queryString = searchParams.toString().replace(/\+/g, "%20");
+    const queryString = config.paramsSerializer
+      ? config.paramsSerializer(config.params)
+      : defaultSerializeParams(config.params);
     if (queryString) {
       url += (url.includes("?") ? "&" : "?") + queryString;
     }

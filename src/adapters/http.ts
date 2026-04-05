@@ -3,9 +3,10 @@ import type { Adapter, AdapterResponse } from './types';
 import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
+import * as zlib from 'zlib';
 
 export const httpAdapter: Adapter = async (config: Config): Promise<AdapterResponse> => {
-  const { url, method = 'GET', headers = {}, body, timeout, signal, onUploadProgress, onDownloadProgress } = config;
+  const { url, method = 'GET', headers = {}, body, timeout, signal, onUploadProgress, onDownloadProgress, maxContentLength, decompress } = config;
 
   if (!url) {
     throw new Error('Missing required "url" in config');
@@ -89,15 +90,45 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
       const contentLength = res.headers['content-length'];
       const total = contentLength ? parseInt(contentLength, 10) : undefined;
 
-      res.on('data', (chunk: Buffer) => {
+      // Check maxContentLength from header
+      if (maxContentLength && contentLength && parseInt(contentLength, 10) > maxContentLength) {
+        cleanup();
+        req.destroy();
+        reject(Object.assign(
+          new Error(`Content length ${contentLength} exceeds limit of ${maxContentLength}`),
+          { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
+        ));
+        return;
+      }
+
+      // Handle decompression
+      let decompressStream: ReturnType<typeof zlib.createGunzip> | null = null;
+      const encoding = res.headers['content-encoding'];
+      if (decompress !== false && encoding === 'gzip') {
+        decompressStream = zlib.createGunzip();
+      }
+
+      const target = decompressStream || res;
+
+      target.on('data', (chunk: Buffer) => {
         chunks.push(chunk);
         downloaded += chunk.length;
+        if (maxContentLength && downloaded > maxContentLength) {
+          target.destroy();
+          cleanup();
+          req.destroy();
+          reject(Object.assign(
+            new Error(`Content length exceeds limit of ${maxContentLength}`),
+            { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
+          ));
+          return;
+        }
         if (onDownloadProgress) {
           onDownloadProgress({ loaded: downloaded, total, bytes: chunk.length });
         }
       });
 
-      res.on('end', () => {
+      target.on('end', () => {
         cleanup();
         const responseHeaders: Record<string, string> = {};
         for (const [key, value] of Object.entries(res.headers)) {
@@ -118,10 +149,15 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
         });
       });
 
-      res.on('error', (err) => {
+      target.on('error', (err) => {
         cleanup();
         reject(err);
       });
+
+      // Pipe response through decompressor if active
+      if (decompressStream) {
+        res.pipe(decompressStream);
+      }
     });
 
     req.on('error', (err: Error & { code?: string }) => {

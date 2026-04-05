@@ -10,6 +10,8 @@ export type {
   BodyType,
   ProgressEvent,
   ProgressCallback,
+  TransformFn,
+  AdapterName,
 } from './types';
 
 export type { RequestInterceptor, ResponseInterceptor, ErrorInterceptor } from './interceptors/types';

@@ -5,18 +5,24 @@ export interface RetryOptions {
   backoff?: 'fixed' | 'exponential' | 'linear';
   retryOn?: number[];
   retryOnNetworkError?: boolean;
+  jitter?: boolean;
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function calculateDelay(attempt: number, backoff: 'fixed' | 'exponential' | 'linear'): number {
+export function calculateDelay(attempt: number, backoff: 'fixed' | 'exponential' | 'linear', jitter = false): number {
+  let ms: number;
   switch (backoff) {
-    case 'fixed': return 1000;
-    case 'linear': return attempt * 1000;
-    case 'exponential': return Math.min(1000 * 2 ** attempt, 30000);
+    case 'fixed': ms = 1000; break;
+    case 'linear': ms = attempt * 1000; break;
+    case 'exponential': ms = Math.min(1000 * 2 ** attempt, 30000); break;
   }
+  if (jitter) {
+    ms = ms * (0.5 + Math.random());
+  }
+  return ms;
 }
 
 export interface RetryConfig {
@@ -26,11 +32,12 @@ export interface RetryConfig {
     backoff: 'fixed' | 'exponential' | 'linear';
     retryOn: number[];
     retryOnNetworkError: boolean;
+    jitter: boolean;
   };
 }
 
 export function retry_plugin(opts: RetryOptions): Plugin {
-  const { maxRetries, backoff = 'exponential', retryOn = [429, 500, 502, 503, 504], retryOnNetworkError = true } = opts;
+  const { maxRetries, backoff = 'exponential', retryOn = [429, 500, 502, 503, 504], retryOnNetworkError = true, jitter = false } = opts;
 
   return {
     name: 'retry',
@@ -42,6 +49,7 @@ export function retry_plugin(opts: RetryOptions): Plugin {
         backoff,
         retryOn,
         retryOnNetworkError,
+        jitter,
       };
       return config;
     },

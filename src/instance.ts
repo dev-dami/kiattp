@@ -33,6 +33,14 @@ export function createInstance(defaults?: Partial<Config>): Instance {
       validateStatus: instanceConfig.validateStatus,
       onUploadProgress: instanceConfig.onUploadProgress,
       onDownloadProgress: instanceConfig.onDownloadProgress,
+      transformRequest: instanceConfig.transformRequest,
+      transformResponse: instanceConfig.transformResponse,
+      adapter: instanceConfig.adapter,
+      xsrfCookieName: instanceConfig.xsrfCookieName,
+      xsrfHeaderName: instanceConfig.xsrfHeaderName,
+      maxContentLength: instanceConfig.maxContentLength,
+      credentials: instanceConfig.credentials,
+      decompress: instanceConfig.decompress,
     }, instanceChain);
   };
 

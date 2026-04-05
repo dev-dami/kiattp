@@ -6,6 +6,7 @@ import { detectAdapter } from "../adapters/detect";
 import { fetchAdapter } from "../adapters/fetch";
 import { httpAdapter } from "../adapters/http";
 import { InterceptorChain } from "../interceptors/chain";
+import { applyXsrfHeaders } from "./xsrf";
 import {
   shouldRetry,
   getRetryDelay,
@@ -29,14 +30,30 @@ export async function request<T = unknown>(
   resolvedConfig.url = fullUrl;
   resolvedConfig = await globalChain.runRequest(resolvedConfig);
 
+  // Apply XSRF headers
+  applyXsrfHeaders(
+    resolvedConfig.headers || {},
+    resolvedConfig.xsrfCookieName,
+    resolvedConfig.xsrfHeaderName,
+  );
+
   const headers = { ...resolvedConfig.headers };
+
+  // Apply transformRequest before serialization
+  let transformedBody = resolvedConfig.body;
+  if (resolvedConfig.transformRequest) {
+    for (const fn of resolvedConfig.transformRequest) {
+      transformedBody = fn(transformedBody, headers) as Config['body'];
+    }
+  }
+
   const serializedBody = serializeBody(
-    resolvedConfig.body,
+    transformedBody,
     headers,
     resolvedConfig.method,
   );
 
-  const adapterName = detectAdapter();
+  const adapterName = resolvedConfig.adapter || detectAdapter();
   const adapter = adapters[adapterName];
 
   try {
@@ -44,11 +61,18 @@ export async function request<T = unknown>(
       ...resolvedConfig,
       body: serializedBody,
     });
-    const data = await parseResponse(
+    let data = await parseResponse(
       adapterResult.body,
       adapterResult.headers,
       resolvedConfig.responseType,
     );
+
+    // Apply transformResponse after parsing
+    if (resolvedConfig.transformResponse) {
+      for (const fn of resolvedConfig.transformResponse) {
+        data = fn(data, adapterResult.headers);
+      }
+    }
 
     const response: Response<T> = {
       data: data as T,
@@ -91,6 +115,14 @@ export async function request<T = unknown>(
           validateStatus: resolvedConfig.validateStatus,
           onUploadProgress: resolvedConfig.onUploadProgress,
           onDownloadProgress: resolvedConfig.onDownloadProgress,
+          transformRequest: resolvedConfig.transformRequest,
+          transformResponse: resolvedConfig.transformResponse,
+          adapter: resolvedConfig.adapter,
+          xsrfCookieName: resolvedConfig.xsrfCookieName,
+          xsrfHeaderName: resolvedConfig.xsrfHeaderName,
+          maxContentLength: resolvedConfig.maxContentLength,
+          credentials: resolvedConfig.credentials,
+          decompress: resolvedConfig.decompress,
         }, errorChain);
       }
       if (errorChain) {

@@ -17,6 +17,10 @@ export interface ProgressEvent {
 
 export type ProgressCallback = (progress: ProgressEvent) => void;
 
+export type AdapterName = 'fetch' | 'http';
+
+export type TransformFn<T = unknown> = (data: T, headers: Record<string, string>) => unknown;
+
 export interface ProxyConfig {
   host: string;
   port: number;
@@ -42,6 +46,7 @@ export interface Config {
   url?: string;
   method?: HttpMethod;
   params?: Record<string, string | number | boolean | null | undefined>;
+  paramsSerializer?: (params: Record<string, string | number | boolean | null | undefined>) => string;
   headers?: Record<string, string>;
   body?: BodyType;
   timeout?: number;
@@ -49,9 +54,17 @@ export interface Config {
   responseType?: ResponseType;
   validateStatus?: (status: number) => boolean;
   maxRedirects?: number;
+  maxContentLength?: number;
   proxy?: ProxyConfig;
   onUploadProgress?: ProgressCallback;
   onDownloadProgress?: ProgressCallback;
+  transformRequest?: TransformFn[];
+  transformResponse?: TransformFn[];
+  credentials?: 'omit' | 'same-origin' | 'include';
+  adapter?: AdapterName;
+  decompress?: boolean;
+  xsrfCookieName?: string;
+  xsrfHeaderName?: string;
 }
 
 export interface Response<T = unknown> {
