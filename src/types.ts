@@ -9,6 +9,14 @@ export type HttpMethod =
 
 export type ResponseType = 'json' | 'text' | 'blob' | 'arraybuffer' | 'stream';
 
+export interface ProgressEvent {
+  loaded: number;
+  total?: number;
+  bytes: number;
+}
+
+export type ProgressCallback = (progress: ProgressEvent) => void;
+
 export interface ProxyConfig {
   host: string;
   port: number;
@@ -16,19 +24,34 @@ export interface ProxyConfig {
   auth?: { username: string; password: string };
 }
 
+export type BodyType =
+  | string
+  | FormData
+  | URLSearchParams
+  | Blob
+  | ArrayBuffer
+  | ArrayBufferView
+  | ReadableStream
+  | Record<string, unknown>
+  | unknown[]
+  | null
+  | undefined;
+
 export interface Config {
   baseURL?: string;
   url?: string;
   method?: HttpMethod;
   params?: Record<string, string | number | boolean | null | undefined>;
   headers?: Record<string, string>;
-  body?: unknown;
+  body?: BodyType;
   timeout?: number;
   signal?: AbortSignal;
   responseType?: ResponseType;
   validateStatus?: (status: number) => boolean;
   maxRedirects?: number;
   proxy?: ProxyConfig;
+  onUploadProgress?: ProgressCallback;
+  onDownloadProgress?: ProgressCallback;
 }
 
 export interface Response<T = unknown> {
