@@ -2,7 +2,7 @@ import type { Config } from '../types';
 import type { Adapter, AdapterResponse } from './types';
 
 export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResponse> => {
-  const { url, method = 'GET', headers = {}, body, signal, timeout } = config;
+  const { url, method = 'GET', headers = {}, body, signal, timeout, onDownloadProgress } = config;
 
   if (!url) {
     throw new Error('Missing required "url" in config');
@@ -29,6 +29,41 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
     response.headers.forEach((value, key) => {
       responseHeaders[key.toLowerCase()] = value;
     });
+
+    // Handle download progress if callback provided
+    if (onDownloadProgress && response.body) {
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : undefined;
+      const reader = response.body.getReader();
+      let loaded = 0;
+      const chunks: Uint8Array[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        onDownloadProgress({ loaded, total, bytes: value.length });
+      }
+
+      // Combine chunks into text
+      const decoder = new TextDecoder();
+      const totalBytes = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combined = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const responseText = decoder.decode(combined);
+
+      return {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        body: responseText,
+      };
+    }
 
     const responseText = await response.text();
 

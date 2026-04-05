@@ -5,7 +5,7 @@ import * as https from 'https';
 import { URL } from 'url';
 
 export const httpAdapter: Adapter = async (config: Config): Promise<AdapterResponse> => {
-  const { url, method = 'GET', headers = {}, body, timeout, signal } = config;
+  const { url, method = 'GET', headers = {}, body, timeout, signal, onUploadProgress, onDownloadProgress } = config;
 
   if (!url) {
     throw new Error('Missing required "url" in config');
@@ -45,19 +45,57 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
       if (timeoutId) clearTimeout(timeoutId);
       if (signal && abortHandler) signal.removeEventListener('abort', abortHandler);
     }
+
+    // Handle upload progress
     if (body !== null && body !== undefined) {
+      let bodyData: string | Buffer | undefined;
+
       if (typeof body === 'string') {
-        req.write(body);
-      } else if (body instanceof URLSearchParams || body instanceof FormData) {
-        req.write(body.toString());
+        bodyData = body;
+      } else if (body instanceof URLSearchParams) {
+        bodyData = body.toString();
+      } else if (body instanceof FormData) {
+        bodyData = body.toString();
+      } else if (body instanceof ArrayBuffer) {
+        bodyData = Buffer.from(body);
+      } else if (Buffer.isBuffer(body)) {
+        bodyData = body;
       } else if (typeof body === 'object') {
-        req.write(JSON.stringify(body));
+        bodyData = JSON.stringify(body);
+      }
+
+      if (bodyData) {
+        const total = typeof bodyData === 'string' ? Buffer.byteLength(bodyData) : bodyData.length;
+        let uploaded = 0;
+
+        req.on('drain', () => {
+          if (onUploadProgress) {
+            onUploadProgress({ loaded: uploaded, total, bytes: 0 });
+          }
+        });
+
+        const written = req.write(bodyData);
+        uploaded += typeof bodyData === 'string' ? Buffer.byteLength(bodyData) : bodyData.length;
+
+        if (onUploadProgress) {
+          onUploadProgress({ loaded: uploaded, total, bytes: typeof bodyData === 'string' ? Buffer.byteLength(bodyData) : bodyData.length });
+        }
       }
     }
 
     req.on('response', (res) => {
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
+      const chunks: Buffer[] = [];
+      let downloaded = 0;
+      const contentLength = res.headers['content-length'];
+      const total = contentLength ? parseInt(contentLength, 10) : undefined;
+
+      res.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+        downloaded += chunk.length;
+        if (onDownloadProgress) {
+          onDownloadProgress({ loaded: downloaded, total, bytes: chunk.length });
+        }
+      });
 
       res.on('end', () => {
         cleanup();
@@ -69,6 +107,8 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
             responseHeaders[key.toLowerCase()] = value.join(', ');
           }
         }
+
+        const data = Buffer.concat(chunks).toString('utf-8');
 
         resolve({
           status: res.statusCode ?? 0,
