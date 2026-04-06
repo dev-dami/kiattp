@@ -15,6 +15,10 @@ const server = setupServer(
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return HttpResponse.json([{ id: 1 }]);
   }),
+  http.post('https://api.example.com/api/auth/login', async ({ request: req }) => {
+    const body = await req.json();
+    return HttpResponse.json({ token: 'abc', ...body });
+  }),
 );
 
 beforeAll(() => server.listen());
@@ -73,5 +77,11 @@ describe('axios compatibility', () => {
       axios.get('https://api.example.com/users'),
     ]);
     expect(results).toHaveLength(2);
+  });
+
+  it('axios.create() with baseURL containing a path prepends full baseURL when path starts with /', async () => {
+    const api = axios.create({ baseURL: 'https://api.example.com/api' });
+    const res = await api.post('/auth/login', { email: 'test@test.com', password: 'test' });
+    expect(res.data).toMatchObject({ token: 'abc', email: 'test@test.com' });
   });
 });

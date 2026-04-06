@@ -23,7 +23,8 @@ export function createInstance(defaults?: Partial<Config>): Instance {
       ...merged,
       url: fullUrl,
     });
-    return request(instanceConfig.url!, instanceConfig, instanceChain);
+    const { baseURL: _baseURL, url: _url, ...resolvedInstanceConfig } = instanceConfig;
+    return request(instanceConfig.url!, resolvedInstanceConfig, instanceChain);
   };
 
   const methodFn = (method: HttpMethod): RequestFn => {
