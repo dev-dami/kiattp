@@ -26,6 +26,10 @@ export class InterceptorChain {
     return current;
   }
 
+  get hasResponse(): boolean {
+    return this.responseInterceptors.length > 0;
+  }
+
   async runResponse(response: Response): Promise<Response> {
     let current = response;
     for (const interceptor of this.responseInterceptors) {
