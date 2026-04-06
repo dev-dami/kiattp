@@ -55,6 +55,26 @@ source.cancel('Cancelled');
 
 See [full Axios compat reference](#axios-compat-reference) below.
 
+## Subpath Exports
+
+Import only what you need to keep your bundle minimal:
+
+```typescript
+// Node.js http adapter (no fetch)
+import { httpAdapter } from 'kiattp/http';
+
+// Individual plugins
+import { retry_plugin } from 'kiattp/plugins/retry';
+import { logger_plugin } from 'kiattp/plugins/logger';
+import { timeout_plugin } from 'kiattp/plugins/timeout';
+
+// Full entry (re-exports everything)
+import { get, createInstance } from 'kiattp';
+
+// Axios compatibility layer
+import { axios } from 'kiattp/axios';
+```
+
 ## Plugins
 
 ```typescript
@@ -62,23 +82,48 @@ import { createInstance, retry_plugin, logger_plugin, timeout_plugin } from 'kia
 
 const api = createInstance({ baseURL: 'https://api.example.com' });
 
-api.use(retry_plugin({ maxRetries: 3, backoff: 'exponential' }));
-api.use(logger_plugin({ level: 'info', format: 'json' }));
+api.use(retry_plugin({ maxRetries: 3, backoff: 'exponential', jitter: true }));
+api.use(logger_plugin({ level: 'info' }));
 api.use(timeout_plugin({ timeout: 10_000 }));
 ```
-
-Custom plugins implement `{ name, onRequest?, onResponse?, onError? }`.
 
 ## Interceptors
 
 ```typescript
+// Request interceptors
 api.interceptors.request.use((config) => {
   config.headers['authorization'] = 'Bearer ' + getToken();
   return config;
 });
 
+// Response interceptors
 api.interceptors.response.use((res) => {
   console.log(`${res.status} ${res.config.url}`);
+  return res;
+});
+
+// Error interceptors
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    console.error(`Request failed: ${error.message}`);
+    return error;
+  },
+);
+```
+
+## Transforms
+
+```typescript
+// Transform request before serialization
+api.interceptors.request.use((config) => {
+  config.headers['x-request-id'] = crypto.randomUUID();
+  return config;
+});
+
+// Transform response after parsing
+api.interceptors.response.use((res) => {
+  res.data = sanitize(res.data);
   return res;
 });
 ```
@@ -90,6 +135,12 @@ api.interceptors.response.use((res) => {
 await post('/upload', {
   body: formData,
   onUploadProgress: ({ loaded, total }) => console.log(`${loaded}/${total}`),
+});
+
+// Download progress
+await get('/file.pdf', {
+  responseType: 'blob',
+  onDownloadProgress: ({ loaded, total }) => console.log(`${loaded}/${total}`),
 });
 
 // Binary responses
@@ -114,6 +165,16 @@ try {
 await get('/maybe-found', { validateStatus: (s) => s < 500 });
 ```
 
+## Per-Instance Adapter
+
+```typescript
+// Force Node.js http adapter (supports proxy, maxRedirects)
+const api = createInstance({ adapter: 'http' });
+
+// Force fetch adapter
+const browser = createInstance({ adapter: 'fetch' });
+```
+
 -----
 
 ## API Reference
@@ -136,16 +197,25 @@ await get('/maybe-found', { validateStatus: (s) => s < 500 });
 |--------------------|------------------------------------------------------------------------------------|----------------------------------------------------------------------------|
 |`baseURL`           |`string`                                                                            |Prepended to relative paths. Trailing/leading slashes handled automatically.|
 |`params`            |`Record<string, string | number | boolean | null | undefined>`                      |Query params — null/undefined skipped                                       |
+|`paramsSerializer`  |`(params: Record<string, unknown>) => string`                                       |Custom query string builder                                                 |
 |`headers`           |`Record<string, string>`                                                            |Deep-merged with instance defaults; call-time wins                          |
 |`body`              |`string | FormData | URLSearchParams | Blob | ArrayBuffer | ReadableStream | object`|Auto-serialized                                                             |
 |`timeout`           |`number`                                                                            |Milliseconds                                                                |
 |`signal`            |`AbortSignal`                                                                       |Cancellation                                                                |
 |`responseType`      |`'json' | 'text' | 'blob' | 'arraybuffer' | 'stream'`                               |Default: `json`                                                             |
 |`validateStatus`    |`(status: number) => boolean`                                                       |Default: 200–299                                                            |
+|`adapter`           |`'fetch' | 'http'`                                                                  |Force a specific transport; defaults to `fetch` when available              |
+|`credentials`       |`RequestCredentials`                                                                |Browser only — `include`, `same-origin`, `omit`                             |
+|`maxContentLength`  |`number`                                                                            |Reject responses larger than this (bytes)                                   |
+|`decompress`        |`boolean`                                                                           |Auto-decompress gzip/deflate/br (Node.js http adapter)                      |
+|`xsrfCookieName`    |`string`                                                                            |CSRF cookie name for XSRF header injection (browser only)                   |
+|`xsrfHeaderName`    |`string`                                                                            |CSRF header name (default: `X-XSRF-TOKEN`)                                  |
+|`transformRequest`  |`TransformFn[]`                                                                     |Functions run before body serialization                                     |
+|`transformResponse` |`TransformFn[]`                                                                     |Functions run after response parsing                                        |
 |`onUploadProgress`  |`(e: ProgressEvent) => void`                                                        |`{ loaded, total?, bytes }`                                                 |
 |`onDownloadProgress`|`(e: ProgressEvent) => void`                                                        |`{ loaded, total?, bytes }`                                                 |
-|`maxRedirects`      |`number`                                                                            |Node.js only                                                                |
-|`proxy`             |`ProxyConfig`                                                                       |`{ host, port, protocol?, auth? }`                                          |
+|`maxRedirects`      |`number`                                                                            |Node.js http adapter only                                                   |
+|`proxy`             |`ProxyConfig`                                                                       |`{ host, port, protocol?, auth? }` — http adapter only                      |
 
 ### Response Shape
 
@@ -177,13 +247,16 @@ interface Response<T> {
 
 ## Benchmarks
 
-See [BENCHMARK.md](./BENCHMARK.md) — 1000+ iterations, MSW mock server, Node.js 18.
+See [BENCHMARK.md](./BENCHMARK.md) — MSW mock server, Node.js 18+.
 
-|            |Size |Mean   |p99    |
-|------------|-----|-------|-------|
-|**kiattp**  |~3KB |0.257ms|0.898ms|
-|**axios**   |~14KB|1.067ms|4.834ms|
-|native fetch|0KB  |0.175ms|0.322ms|
+|            |ops/sec|Mean   |p99    |Size (gzipped)|
+|------------|-------|-------|-------|--------------|
+|**kiattp**  |~4,000 |0.25ms |0.80ms |~3.7KB        |
+|**axios**   |~940   |1.07ms |4.83ms |~14KB         |
+|native fetch|~6,100 |0.16ms |0.32ms |0KB           |
+
+- kiattp is **~4× faster than Axios** and **~1.5× slower than native fetch**
+- The ~0.09ms overhead vs fetch pays for config normalization, interceptors, and error handling
 
 -----
 
