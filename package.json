@@ -16,6 +16,7 @@
       "import": "./dist/axios.js"
     }
   },
+  "sideEffects": false,
   "files": [
     "dist"
   ],
@@ -25,8 +26,17 @@
     "test:watch": "vitest",
     "bench": "vitest bench --run",
     "size": "node scripts/size-check.mjs",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dev-dami/kiattp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dev-dami/kiattp/issues"
+  },
+  "homepage": "https://github.com/dev-dami/kiattp#readme",
   "keywords": [
     "http",
     "https",
