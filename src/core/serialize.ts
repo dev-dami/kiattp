@@ -55,7 +55,7 @@ export function serializeBody(
     return JSON.stringify(body);
   } catch (err) {
     throw new TypeError(
-      `Failed to serialize body as JSON: ${err instanceof Error ? err.message : String(err)}`,
+      `JSON serialize failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }
@@ -67,51 +67,23 @@ export async function parseResponse(
   _headers: Record<string, string>,
   responseType?: ResponseType,
 ): Promise<unknown> {
-  if (!bodySource) {
-    return null;
-  }
+  if (!bodySource) return null;
 
-  // Handle fetch Response objects
   if (bodySource instanceof globalThis.Response) {
-    const resp = bodySource as FetchResponse;
-    switch (responseType) {
-      case "blob":
-        return resp.blob();
-      case "arraybuffer":
-        return resp.arrayBuffer();
-      case "stream":
-        return resp.body;
-      case "text":
-        return resp.text();
-      case "json":
-      default: {
-        const text = await resp.text();
-        if (!text) return null;
-        try {
-          return JSON.parse(text);
-        } catch {
-          return text;
-        }
-      }
-    }
+    const r = bodySource as FetchResponse;
+    if (responseType === "blob") return r.blob();
+    if (responseType === "arraybuffer") return r.arrayBuffer();
+    if (responseType === "stream") return r.body;
+    if (responseType === "text") return r.text();
+    const text = await r.text();
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return text; }
   }
 
-  // Handle string body (from Node.js http adapter or fallback)
   if (typeof bodySource === "string") {
-    if (!bodySource) return null;
-    if (responseType === "text") {
-      return bodySource;
-    }
-    if (responseType === "arraybuffer") {
-      return new TextEncoder().encode(bodySource).buffer;
-    }
-
-    // def: try JSON, fall back text
-    try {
-      return JSON.parse(bodySource);
-    } catch {
-      return bodySource;
-    }
+    if (responseType === "text") return bodySource;
+    if (responseType === "arraybuffer") return new TextEncoder().encode(bodySource).buffer;
+    try { return JSON.parse(bodySource); } catch { return bodySource; }
   }
 
   return bodySource;

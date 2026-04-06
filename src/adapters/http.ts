@@ -95,7 +95,7 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
         cleanup();
         req.destroy();
         reject(Object.assign(
-          new Error(`Content length ${contentLength} exceeds limit of ${maxContentLength}`),
+          new Error(`Response too large (${contentLength} > ${maxContentLength})`),
           { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
         ));
         return;
@@ -118,7 +118,7 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
           cleanup();
           req.destroy();
           reject(Object.assign(
-            new Error(`Content length exceeds limit of ${maxContentLength}`),
+            new Error(`Response too large (> ${maxContentLength} bytes)`),
             { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
           ));
           return;

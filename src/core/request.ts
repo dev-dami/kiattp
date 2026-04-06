@@ -84,7 +84,7 @@ export async function request<T = unknown>(
 
     if (!resolvedConfig.validateStatus!(adapterResult.status)) {
       const error: HttpError = Object.assign(
-        new Error(`Request failed with status ${adapterResult.status}`),
+        new Error(`HTTP ${adapterResult.status}`),
         {
           name: "HttpError" as const,
           isAxiosError: true,
@@ -105,25 +105,8 @@ export async function request<T = unknown>(
         await new Promise((r) =>
           setTimeout(r, getRetryDelay(resolvedConfig as Config & RetryConfig)),
         );
-        return request<T>(resolvedConfig.url!, {
-          method: resolvedConfig.method,
-          headers: resolvedConfig.headers,
-          body: resolvedConfig.body,
-          timeout: resolvedConfig.timeout,
-          signal: resolvedConfig.signal,
-          responseType: resolvedConfig.responseType,
-          validateStatus: resolvedConfig.validateStatus,
-          onUploadProgress: resolvedConfig.onUploadProgress,
-          onDownloadProgress: resolvedConfig.onDownloadProgress,
-          transformRequest: resolvedConfig.transformRequest,
-          transformResponse: resolvedConfig.transformResponse,
-          adapter: resolvedConfig.adapter,
-          xsrfCookieName: resolvedConfig.xsrfCookieName,
-          xsrfHeaderName: resolvedConfig.xsrfHeaderName,
-          maxContentLength: resolvedConfig.maxContentLength,
-          credentials: resolvedConfig.credentials,
-          decompress: resolvedConfig.decompress,
-        }, errorChain);
+        const { url: _, ...retryConfig } = resolvedConfig;
+        return request<T>(resolvedConfig.url!, retryConfig, errorChain);
       }
       if (errorChain) {
         const processedError = await errorChain.runError(err as HttpError);

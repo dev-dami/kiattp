@@ -16,26 +16,24 @@ function defaultSerializeParams(
   return searchParams.toString().replace(/\+/g, "%20");
 }
 
+function trimTrailingSlash(url: string): string {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
 export function buildUrl(
   config: Pick<Config, "baseURL" | "url" | "params" | "paramsSerializer">,
 ): string {
   let url = "";
 
   if (config.baseURL) {
-    url = config.baseURL.endsWith("/")
-      ? config.baseURL.slice(0, -1)
-      : config.baseURL;
+    url = trimTrailingSlash(config.baseURL);
   }
 
   if (config.url) {
     if (isAbsoluteUrl(config.url)) {
       url = config.url;
     } else {
-      const baseURL = config.baseURL
-        ? config.baseURL.endsWith("/")
-          ? config.baseURL.slice(0, -1)
-          : config.baseURL
-        : "";
+      const baseURL = config.baseURL ? trimTrailingSlash(config.baseURL) : "";
       const path = config.url.startsWith("/") ? config.url : "/" + config.url;
       url = baseURL + path;
     }

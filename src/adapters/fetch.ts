@@ -31,7 +31,7 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
       const contentLength = response.headers.get('content-length');
       if (contentLength && parseInt(contentLength, 10) > maxContentLength) {
         throw Object.assign(
-          new Error(`Content length ${contentLength} exceeds limit of ${maxContentLength}`),
+          new Error(`Response too large (${contentLength} > ${maxContentLength})`),
           { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
         );
       }
@@ -58,7 +58,7 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
         if (byteLimit && loaded > byteLimit) {
           reader.cancel();
           throw Object.assign(
-            new Error(`Content length exceeds limit of ${byteLimit}`),
+            new Error(`Response too large (> ${byteLimit} bytes)`),
             { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
           );
         }

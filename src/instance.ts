@@ -23,25 +23,7 @@ export function createInstance(defaults?: Partial<Config>): Instance {
       ...merged,
       url: fullUrl,
     });
-    return request(instanceConfig.url!, {
-      method: instanceConfig.method,
-      headers: instanceConfig.headers,
-      body: instanceConfig.body,
-      timeout: instanceConfig.timeout,
-      signal: instanceConfig.signal,
-      responseType: instanceConfig.responseType,
-      validateStatus: instanceConfig.validateStatus,
-      onUploadProgress: instanceConfig.onUploadProgress,
-      onDownloadProgress: instanceConfig.onDownloadProgress,
-      transformRequest: instanceConfig.transformRequest,
-      transformResponse: instanceConfig.transformResponse,
-      adapter: instanceConfig.adapter,
-      xsrfCookieName: instanceConfig.xsrfCookieName,
-      xsrfHeaderName: instanceConfig.xsrfHeaderName,
-      maxContentLength: instanceConfig.maxContentLength,
-      credentials: instanceConfig.credentials,
-      decompress: instanceConfig.decompress,
-    }, instanceChain);
+    return request(instanceConfig.url!, instanceConfig, instanceChain);
   };
 
   const methodFn = (method: HttpMethod): RequestFn => {
