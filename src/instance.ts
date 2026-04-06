@@ -23,9 +23,6 @@ export function createInstance(defaults?: Partial<Config>): Instance {
       ...merged,
       url: fullUrl,
     });
-    // Strip baseURL and url from instanceConfig before passing to request(),
-    // since the URL is already fully resolved by buildUrl() above.
-    // This prevents baseURL from being applied twice in core/request.ts.
     const { baseURL: _baseURL, url: _url, ...resolvedInstanceConfig } = instanceConfig;
     return request(instanceConfig.url!, resolvedInstanceConfig, instanceChain);
   };
