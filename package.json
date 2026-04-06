@@ -14,6 +14,22 @@
     "./axios": {
       "types": "./dist/axios.d.ts",
       "import": "./dist/axios.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.js"
+    },
+    "./plugins/retry": {
+      "types": "./dist/plugins/retry.d.ts",
+      "import": "./dist/plugins/retry.js"
+    },
+    "./plugins/logger": {
+      "types": "./dist/plugins/logger.d.ts",
+      "import": "./dist/plugins/logger.js"
+    },
+    "./plugins/timeout": {
+      "types": "./dist/plugins/timeout.d.ts",
+      "import": "./dist/plugins/timeout.js"
     }
   },
   "sideEffects": false,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { InterceptorChain } from '../../src/interceptors/chain';
-import type { Config, Response } from '../../src/types';
+import type { Config, Response, HttpError } from '../../src/types';
 
 describe('InterceptorChain', () => {
   it('runs request interceptors in order', async () => {
@@ -39,6 +39,27 @@ describe('InterceptorChain', () => {
     expect(order).toEqual(['first', 'second']);
   });
 
+  it('runs error interceptors in order', async () => {
+    const chain = new InterceptorChain();
+    const order: string[] = [];
+
+    chain.addError(async (error) => {
+      order.push('first');
+      return error;
+    });
+    chain.addError(async (error) => {
+      order.push('second');
+      return error;
+    });
+
+    const error: HttpError = Object.assign(new Error('boom'), {
+      name: 'NetworkError' as const,
+      isAxiosError: true,
+    });
+    await chain.runError(error);
+    expect(order).toEqual(['first', 'second']);
+  });
+
   it('request interceptors can modify config', async () => {
     const chain = new InterceptorChain();
     chain.addRequest(async (config) => {
@@ -63,6 +84,25 @@ describe('InterceptorChain', () => {
     expect(result.data).toBe('modified');
   });
 
+  it('error interceptors can transform the error', async () => {
+    const chain = new InterceptorChain();
+    chain.addError(async (error) => {
+      return Object.assign(new Error('wrapped: ' + error.message), {
+        name: 'NetworkError' as const,
+        isAxiosError: true,
+        handled: true,
+      });
+    });
+
+    const error: HttpError = Object.assign(new Error('timeout'), {
+      name: 'NetworkError' as const,
+      isAxiosError: true,
+    });
+    const result = await chain.runError(error);
+    expect(result.message).toBe('wrapped: timeout');
+    expect((result as any).handled).toBe(true);
+  });
+
   it('propagates request interceptor errors', async () => {
     const chain = new InterceptorChain();
     chain.addRequest(async () => {
@@ -81,5 +121,75 @@ describe('InterceptorChain', () => {
 
     const response: Response = { data: null, status: 200, statusText: 'OK', headers: {}, config: {} };
     await expect(chain.runResponse(response)).rejects.toThrow('response error');
+  });
+
+  it('propagates error interceptor errors', async () => {
+    const chain = new InterceptorChain();
+    chain.addError(async () => {
+      throw new Error('error handler failed');
+    });
+
+    const error: HttpError = Object.assign(new Error('original'), {
+      name: 'NetworkError' as const,
+      isAxiosError: true,
+    });
+    await expect(chain.runError(error)).rejects.toThrow('error handler failed');
+  });
+
+  it('error interceptors can swallow and return a different error', async () => {
+    const chain = new InterceptorChain();
+    chain.addError(async () => {
+      return Object.assign(new Error('recovered'), {
+        name: 'HttpError' as const,
+        isAxiosError: true,
+        status: 503,
+      });
+    });
+
+    const error: HttpError = Object.assign(new Error('500'), {
+      name: 'HttpError' as const,
+      isAxiosError: true,
+      status: 500,
+    });
+    const result = await chain.runError(error);
+    expect(result.message).toBe('recovered');
+    expect(result.status).toBe(503);
+  });
+
+  it('skips error interceptors when none registered', async () => {
+    const chain = new InterceptorChain();
+    const error: HttpError = Object.assign(new Error('raw'), {
+      name: 'NetworkError' as const,
+      isAxiosError: true,
+    });
+    const result = await chain.runError(error);
+    expect(result.message).toBe('raw');
+    expect(result).toBe(error);
+  });
+
+  it('chains multiple error interceptors with early return', async () => {
+    const chain = new InterceptorChain();
+    const calls: number[] = [];
+
+    chain.addError(async (error) => {
+      calls.push(1);
+      return error;
+    });
+    chain.addError(async (error) => {
+      calls.push(2);
+      return Object.assign(new Error('intercepted'), error, { name: 'HttpError' as const, isAxiosError: true });
+    });
+    chain.addError(async (error) => {
+      calls.push(3);
+      return error;
+    });
+
+    const error: HttpError = Object.assign(new Error('fail'), {
+      name: 'HttpError' as const,
+      isAxiosError: true,
+    });
+    const result = await chain.runError(error);
+    expect(calls).toEqual([1, 2, 3]);
+    expect(result.message).toBe('intercepted');
   });
 });
