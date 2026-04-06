@@ -5,12 +5,14 @@ const DEFAULT_VALIDATE_STATUS = (status: number) =>
 
 const EMPTY_HEADERS: Record<string, string> = {};
 
+const DEFAULT_CONFIG: Config = {
+  method: "GET",
+  headers: EMPTY_HEADERS,
+  validateStatus: DEFAULT_VALIDATE_STATUS,
+};
+
 export function defaultConfig(): Config {
-  return {
-    method: "GET",
-    headers: EMPTY_HEADERS,
-    validateStatus: DEFAULT_VALIDATE_STATUS,
-  };
+  return { ...DEFAULT_CONFIG };
 }
 
 export function normalizeConfig(
@@ -20,20 +22,18 @@ export function normalizeConfig(
   const instanceHeaders = instanceDefaults?.headers;
   const callHeaders = callConfig.headers;
 
-  // Only allocate mergedHeaders when there's something to merge
   const mergedHeaders =
     instanceHeaders || callHeaders
       ? { ...instanceHeaders, ...callHeaders }
       : EMPTY_HEADERS;
 
   const merged: Config = {
-    ...defaultConfig(),
+    ...DEFAULT_CONFIG,
     ...instanceDefaults,
     ...callConfig,
     headers: mergedHeaders,
   };
 
-  // Only normalize when there are headers
   if (Object.keys(mergedHeaders).length > 0) {
     const normalizedHeaders: Record<string, string> = {};
     for (const [key, value] of Object.entries(mergedHeaders)) {

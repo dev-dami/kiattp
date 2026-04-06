@@ -7,56 +7,24 @@ export function serializeBody(
   headers: Record<string, string>,
   method?: string,
 ): BodyInit | undefined {
-  if (method && NO_BODY_METHODS.has(method.toUpperCase())) {
-    return undefined;
-  }
+  const m = method?.toUpperCase();
+  if (m === "GET" || m === "HEAD") return undefined;
+  if (body === undefined || body === null) return undefined;
 
-  if (body === undefined || body === null) {
-    return undefined;
-  }
-
-  if (typeof FormData !== "undefined" && body instanceof FormData) {
-    // Don't set Content-Type for FormData; the browser sets the boundary
-    return body;
-  }
-
+  if (typeof FormData !== "undefined" && body instanceof FormData) return body;
   if (body instanceof URLSearchParams) {
-    if (!headers["content-type"]) {
-      headers["content-type"] = "application/x-www-form-urlencoded";
-    }
+    if (!headers["content-type"]) headers["content-type"] = "application/x-www-form-urlencoded";
     return body;
   }
+  if (typeof Blob !== "undefined" && body instanceof Blob) return body;
+  if (body instanceof ArrayBuffer) return body;
+  if (ArrayBuffer.isView(body)) return body as BodyInit;
+  if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) return body;
+  if (typeof body === "string") return body;
 
-  if (typeof Blob !== "undefined" && body instanceof Blob) {
-    return body;
-  }
-
-  if (body instanceof ArrayBuffer) {
-    return body;
-  }
-
-  if (ArrayBuffer.isView(body)) {
-    return body as BodyInit;
-  }
-
-  if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) {
-    return body;
-  }
-
-  if (typeof body === "string") {
-    return body;
-  }
-
-  // def: serialize as JSON
-  if (!headers["content-type"]) {
-    headers["content-type"] = "application/json";
-  }
-  try {
-    return JSON.stringify(body);
-  } catch (err) {
-    throw new TypeError(
-      `JSON serialize failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
+  if (!headers["content-type"]) headers["content-type"] = "application/json";
+  try { return JSON.stringify(body); } catch (err) {
+    throw new TypeError(`JSON serialize failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -64,7 +32,7 @@ type FetchResponse = globalThis.Response;
 
 export async function parseResponse(
   bodySource: FetchResponse | string | ReadableStream | null,
-  _headers: Record<string, string>,
+  headers: Record<string, string>,
   responseType?: ResponseType,
 ): Promise<unknown> {
   if (!bodySource) return null;
@@ -75,14 +43,19 @@ export async function parseResponse(
     if (responseType === "arraybuffer") return r.arrayBuffer();
     if (responseType === "stream") return r.body;
     if (responseType === "text") return r.text();
-    // Default: native json(), fall back to text on parse error
-    try { return await r.clone().json(); } catch { const t = await r.text(); return t || null; }
+    // responseType === "json" or undefined: parse as JSON
+    const text = await r.text();
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return text; }
   }
 
   if (typeof bodySource === "string") {
     if (responseType === "text") return bodySource;
     if (responseType === "arraybuffer") return new TextEncoder().encode(bodySource).buffer;
-    try { return JSON.parse(bodySource); } catch { return bodySource; }
+    if (responseType === "json" || !headers["content-type"]) {
+      try { return JSON.parse(bodySource); } catch { return bodySource; }
+    }
+    return bodySource;
   }
 
   return bodySource;

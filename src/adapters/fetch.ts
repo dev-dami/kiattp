@@ -30,12 +30,11 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
       credentials: credentials as RequestCredentials | undefined,
     });
 
-    // Check maxContentLength
     if (maxContentLength) {
-      const contentLength = response.headers.get('content-length');
-      if (contentLength && parseInt(contentLength, 10) > maxContentLength) {
+      const cl = response.headers.get('content-length');
+      if (cl && parseInt(cl, 10) > maxContentLength) {
         throw Object.assign(
-          new Error(`Response too large (${contentLength} > ${maxContentLength})`),
+          new Error(`Response too large (${cl} > ${maxContentLength})`),
           { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
         );
       }
@@ -46,62 +45,41 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
       responseHeaders[key.toLowerCase()] = value;
     });
 
-    // For json/text, let request.ts parse — use direct methods for speed
-    if (!onDownloadProgress) {
-      const respType = config.responseType;
-      if (respType === 'blob') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.blob() as any };
-      if (respType === 'arraybuffer') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.arrayBuffer() as any };
-      if (respType === 'stream') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response.body as any };
-      if (respType === 'text') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.text() };
-      // Default (json/undefined): return Response object for parseResponse to handle
-      return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response };
-    }
+    // Binary types: return directly
+    if (onDownloadProgress) return await _readProgress(response, responseHeaders, onDownloadProgress, maxContentLength);
+    if (config.responseType === 'blob') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.blob() as any };
+    if (config.responseType === 'arraybuffer') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.arrayBuffer() as any };
+    if (config.responseType === 'stream') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response.body as any };
 
-    // Download progress path — manual streaming
-    if (onDownloadProgress && response.body) {
-      const contentLength = response.headers.get('content-length');
-      const total = contentLength ? parseInt(contentLength, 10) : undefined;
-      const reader = response.body.getReader();
-      let loaded = 0;
-      let byteLimit = maxContentLength;
-      const chunks: Uint8Array[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        loaded += value.length;
-        if (byteLimit && loaded > byteLimit) {
-          reader.cancel();
-          throw Object.assign(
-            new Error(`Response too large (> ${byteLimit} bytes)`),
-            { name: 'NetworkError', code: 'ERR_BAD_RESPONSE' },
-          );
-        }
-        chunks.push(value);
-        onDownloadProgress({ loaded, total, bytes: value.length });
-      }
-
-      const decoder = new TextDecoder();
-      const totalBytes = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const combined = new Uint8Array(totalBytes);
-      let offset = 0;
-      for (const chunk of chunks) {
-        combined.set(chunk, offset);
-        offset += chunk.length;
-      }
-      const responseText = decoder.decode(combined);
-
-      return {
-        status: response.status,
-        statusText: response.statusText,
-        headers: responseHeaders,
-        body: responseText,
-      };
-    }
-
-    // Fallback: return Response for json parsing by parseResponse
+    // json/undefined/text: return Response for parseResponse to handle with native methods
     return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
 };
+
+async function _readProgress(
+  response: Response,
+  responseHeaders: Record<string, string>,
+  onDownloadProgress: import('../types').ProgressCallback,
+  maxContentLength?: number,
+): Promise<AdapterResponse> {
+  if (!response.body) return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.text() };
+  const cl = response.headers.get('content-length');
+  const total = cl ? parseInt(cl, 10) : undefined;
+  const reader = response.body.getReader();
+  let loaded = 0;
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    loaded += value.length;
+    if (maxContentLength && loaded > maxContentLength) throw Object.assign(new Error(`Response too large (> ${maxContentLength})`), { name: 'NetworkError' });
+    chunks.push(value);
+    onDownloadProgress({ loaded, total, bytes: value.length });
+  }
+  const out = new Uint8Array(loaded);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: new TextDecoder().decode(out) };
+}

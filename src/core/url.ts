@@ -25,10 +25,6 @@ export function buildUrl(
 ): string {
   let url = "";
 
-  if (config.baseURL) {
-    url = trimTrailingSlash(config.baseURL);
-  }
-
   if (config.url) {
     if (isAbsoluteUrl(config.url)) {
       url = config.url;
@@ -37,6 +33,8 @@ export function buildUrl(
       const path = config.url.startsWith("/") ? config.url : "/" + config.url;
       url = baseURL + path;
     }
+  } else if (config.baseURL) {
+    url = trimTrailingSlash(config.baseURL);
   }
 
   if (config.params && Object.keys(config.params).length > 0) {

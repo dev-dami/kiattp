@@ -47,40 +47,14 @@ export const httpAdapter: Adapter = async (config: Config): Promise<AdapterRespo
       if (signal && abortHandler) signal.removeEventListener('abort', abortHandler);
     }
 
-    // Handle upload progress
+    // Write pre-serialized body
     if (body !== null && body !== undefined) {
-      let bodyData: string | Buffer | undefined;
-
-      if (typeof body === 'string') {
-        bodyData = body;
-      } else if (body instanceof URLSearchParams) {
-        bodyData = body.toString();
-      } else if (body instanceof FormData) {
-        bodyData = body.toString();
-      } else if (body instanceof ArrayBuffer) {
-        bodyData = Buffer.from(body);
-      } else if (Buffer.isBuffer(body)) {
-        bodyData = body;
-      } else if (typeof body === 'object') {
-        bodyData = JSON.stringify(body);
-      }
-
-      if (bodyData) {
-        const total = typeof bodyData === 'string' ? Buffer.byteLength(bodyData) : bodyData.length;
-        let uploaded = 0;
-
-        req.on('drain', () => {
-          if (onUploadProgress) {
-            onUploadProgress({ loaded: uploaded, total, bytes: 0 });
-          }
-        });
-
-        const written = req.write(bodyData);
-        uploaded += typeof bodyData === 'string' ? Buffer.byteLength(bodyData) : bodyData.length;
-
-        if (onUploadProgress) {
-          onUploadProgress({ loaded: uploaded, total, bytes: typeof bodyData === 'string' ? Buffer.byteLength(bodyData) : bodyData.length });
-        }
+      if (typeof body === "string") {
+        req.write(body);
+      } else if (body instanceof FormData || body instanceof URLSearchParams) {
+        req.write(body.toString());
+      } else if (body instanceof ArrayBuffer || Buffer.isBuffer(body)) {
+        req.write(Buffer.isBuffer(body) ? body : Buffer.from(body as ArrayBuffer));
       }
     }
 
