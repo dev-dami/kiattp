@@ -75,9 +75,8 @@ export async function parseResponse(
     if (responseType === "arraybuffer") return r.arrayBuffer();
     if (responseType === "stream") return r.body;
     if (responseType === "text") return r.text();
-    const text = await r.text();
-    if (!text) return null;
-    try { return JSON.parse(text); } catch { return text; }
+    // Default: native json(), fall back to text on parse error
+    try { return await r.clone().json(); } catch { const t = await r.text(); return t || null; }
   }
 
   if (typeof bodySource === "string") {

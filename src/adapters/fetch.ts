@@ -8,16 +8,20 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
     throw new Error('Missing required "url" in config');
   }
 
-  const timeoutController = new AbortController();
-  const timeoutId = timeout
-    ? setTimeout(() => timeoutController.abort(), timeout)
-    : undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let fetchSignal: AbortSignal | undefined;
 
-  try {
-    const fetchSignal = signal
+  if (timeout) {
+    const timeoutController = new AbortController();
+    timeoutId = setTimeout(() => timeoutController.abort(), timeout);
+    fetchSignal = signal
       ? AbortSignal.any([signal, timeoutController.signal])
       : timeoutController.signal;
+  } else if (signal) {
+    fetchSignal = signal;
+  }
 
+  try {
     const response = await fetch(url, {
       method,
       headers,
@@ -42,7 +46,18 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
       responseHeaders[key.toLowerCase()] = value;
     });
 
-    // Handle download progress if callback provided
+    // For json/text, let request.ts parse — use direct methods for speed
+    if (!onDownloadProgress) {
+      const respType = config.responseType;
+      if (respType === 'blob') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.blob() as any };
+      if (respType === 'arraybuffer') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.arrayBuffer() as any };
+      if (respType === 'stream') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response.body as any };
+      if (respType === 'text') return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: await response.text() };
+      // Default (json/undefined): return Response object for parseResponse to handle
+      return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response };
+    }
+
+    // Download progress path — manual streaming
     if (onDownloadProgress && response.body) {
       const contentLength = response.headers.get('content-length');
       const total = contentLength ? parseInt(contentLength, 10) : undefined;
@@ -84,14 +99,8 @@ export const fetchAdapter: Adapter = async (config: Config): Promise<AdapterResp
       };
     }
 
-    const responseText = await response.text();
-
-    return {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders,
-      body: responseText,
-    };
+    // Fallback: return Response for json parsing by parseResponse
+    return { status: response.status, statusText: response.statusText, headers: responseHeaders, body: response };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }

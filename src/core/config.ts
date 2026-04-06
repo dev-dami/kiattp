@@ -1,10 +1,15 @@
 import type { Config } from "../types";
 
+const DEFAULT_VALIDATE_STATUS = (status: number) =>
+  status >= 200 && status < 300;
+
+const EMPTY_HEADERS: Record<string, string> = {};
+
 export function defaultConfig(): Config {
   return {
     method: "GET",
-    headers: {},
-    validateStatus: (status: number) => status >= 200 && status < 300,
+    headers: EMPTY_HEADERS,
+    validateStatus: DEFAULT_VALIDATE_STATUS,
   };
 }
 
@@ -12,11 +17,14 @@ export function normalizeConfig(
   callConfig: Partial<Config>,
   instanceDefaults?: Partial<Config>,
 ): Config {
-  // Deep merge headers to preserve instance defaults
-  const mergedHeaders: Record<string, string> = {
-    ...(instanceDefaults?.headers || {}),
-    ...(callConfig.headers || {}),
-  };
+  const instanceHeaders = instanceDefaults?.headers;
+  const callHeaders = callConfig.headers;
+
+  // Only allocate mergedHeaders when there's something to merge
+  const mergedHeaders =
+    instanceHeaders || callHeaders
+      ? { ...instanceHeaders, ...callHeaders }
+      : EMPTY_HEADERS;
 
   const merged: Config = {
     ...defaultConfig(),
@@ -24,14 +32,15 @@ export function normalizeConfig(
     ...callConfig,
     headers: mergedHeaders,
   };
-  const config: Config = { ...merged };
 
-  // Normalize header keys to lowercase
-  const normalizedHeaders: Record<string, string> = {};
-  for (const [key, value] of Object.entries(config.headers || {})) {
-    normalizedHeaders[key.toLowerCase()] = value;
+  // Only normalize when there are headers
+  if (Object.keys(mergedHeaders).length > 0) {
+    const normalizedHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(mergedHeaders)) {
+      normalizedHeaders[key.toLowerCase()] = value;
+    }
+    merged.headers = normalizedHeaders;
   }
-  config.headers = normalizedHeaders;
 
-  return config;
+  return merged;
 }

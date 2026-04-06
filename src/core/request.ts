@@ -37,7 +37,8 @@ export async function request<T = unknown>(
     resolvedConfig.xsrfHeaderName,
   );
 
-  const headers = { ...resolvedConfig.headers };
+  const noBody = resolvedConfig.method === "GET" || resolvedConfig.method === "HEAD";
+  const headers = noBody ? resolvedConfig.headers || {} : { ...resolvedConfig.headers };
 
   // Apply transformRequest before serialization
   let transformedBody = resolvedConfig.body;
@@ -47,11 +48,9 @@ export async function request<T = unknown>(
     }
   }
 
-  const serializedBody = serializeBody(
-    transformedBody,
-    headers,
-    resolvedConfig.method,
-  );
+  const serializedBody = noBody
+    ? undefined
+    : serializeBody(transformedBody, headers, resolvedConfig.method);
 
   const adapterName = resolvedConfig.adapter || detectAdapter();
   const adapter = adapters[adapterName];
