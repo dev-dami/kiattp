@@ -96,7 +96,11 @@ export async function request<T = unknown>(
       throw error;
     }
 
-    return globalChain.runResponse(response) as Promise<Response<T>>;
+    // Run instance response interceptors first, then global
+    const afterInstance = errorChain
+      ? await errorChain.runResponse(response)
+      : response;
+    return globalChain.runResponse(afterInstance) as Promise<Response<T>>;
   } catch (err: unknown) {
     if ((err as HttpError).name === "HttpError") {
       if (shouldRetry(err as HttpError)) {
