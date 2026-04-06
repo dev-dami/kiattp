@@ -1,12 +1,23 @@
 # kiattp
 
-> The Axios replacement. 4.1x faster, ~3KB minified, zero dependencies.
+<div align="center">
+
+[![npm version](https://img.shields.io/npm/v/kiattp.svg?color=007EC6)](https://www.npmjs.com/package/kiattp)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/kiattp?color=58A6FF)](https://bundlephobia.com/package/kiattp)
+[![CI](https://github.com/dev-dami/kiattp/actions/workflows/ci.yml/badge.svg)](https://github.com/dev-dami/kiattp/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/kiattp?color=green)](LICENSE)
+[![node](https://img.shields.io/node/v/kiattp)](https://nodejs.org)
+[![downloads](https://img.shields.io/npm/dm/kiattp)](https://www.npmjs.com/package/kiattp)
+
+</div>
+
+> **A zero-dependency, fast, lightweight HTTP client.** 4× faster than Axios, ~3.7KB gzipped, zero dependencies.
 
 ```bash
 npm install kiattp
 ```
 
-No postinstall scripts. No dependency tree to poison.
+No postinstall scripts · No dependency tree to audit · Zero runtime deps
 
 -----
 
