@@ -26,8 +26,16 @@ export class InterceptorChain {
     return current;
   }
 
+  get hasRequest(): boolean {
+    return this.requestInterceptors.length > 0;
+  }
+
   get hasResponse(): boolean {
     return this.responseInterceptors.length > 0;
+  }
+
+  get hasError(): boolean {
+    return this.errorInterceptors.length > 0;
   }
 
   async runResponse(response: Response): Promise<Response> {

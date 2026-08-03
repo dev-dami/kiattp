@@ -2,21 +2,22 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createInstance } from '../../src/instance';
 
 describe('baseURL + leading slash path (relative baseURL)', () => {
+  const originalFetch = globalThis.fetch;
+
   afterEach(() => {
-    vi.restoreAllMocks();
+    globalThis.fetch = originalFetch;
   });
 
   it('does not double-prefix baseURL when path starts with /', async () => {
     const capturedUrls: string[] = [];
 
-    // Spy on global fetch to capture the URL actually used
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      capturedUrls.push(url);
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      capturedUrls.push(String(url));
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }));
+    }) as typeof fetch;
 
     const instance = createInstance({ baseURL: '/api' });
     await instance.post('/auth/login', { body: { email: 'test@test.com' } });
@@ -29,13 +30,13 @@ describe('baseURL + leading slash path (relative baseURL)', () => {
   it('does not double-prefix baseURL when path does not start with /', async () => {
     const capturedUrls: string[] = [];
 
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      capturedUrls.push(url);
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      capturedUrls.push(String(url));
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }));
+    }) as typeof fetch;
 
     const instance = createInstance({ baseURL: '/api' });
     await instance.get('users');
