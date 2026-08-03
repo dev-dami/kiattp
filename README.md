@@ -78,14 +78,42 @@ import { axios } from 'kiattp/axios';
 ## Plugins
 
 ```typescript
-import { createInstance, retry_plugin, logger_plugin, timeout_plugin } from 'kiattp';
+import { createInstance, retry_plugin, logger_plugin, timeout_plugin, devtools_plugin } from 'kiattp';
 
 const api = createInstance({ baseURL: 'https://api.example.com' });
 
 api.use(retry_plugin({ maxRetries: 3, backoff: 'exponential', jitter: true }));
 api.use(logger_plugin({ level: 'info' }));
 api.use(timeout_plugin({ timeout: 10_000 }));
+api.use(devtools_plugin()); // 👈 Zero-config terminal Network Tab!
 ```
+
+## Terminal DevTools Network Tab
+
+Inspect all in-flight HTTP requests, latency waterfalls, and payload sizes directly in your Node.js terminal with zero dependencies:
+
+```typescript
+import { devtools_plugin } from 'kiattp/plugins/devtools';
+
+const api = createInstance({ baseURL: 'https://api.github.com' });
+api.use(devtools_plugin());
+
+// Instant colorful ASCII request waterfall in terminal:
+await Promise.all([
+  api.get('/users/octocat'),
+  api.get('/orgs/facebook'),
+  api.get('/repos/vercel/next.js'),
+]);
+```
+
+Terminal output:
+```text
+┌─ kiattp devtools v0.4.0 ─────────────────────────────────────────────┐
+│ GET    /users/octocat              200 ██████░░░░░░░░░░   42ms 1.2 KB
+│ GET    /orgs/facebook              200 ████████████░░░░   78ms 3.4 KB
+│ GET    /repos/vercel/next.js       200 ████████████████  112ms 8.9 KB
+```
+
 
 ## Interceptors
 

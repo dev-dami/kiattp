@@ -22,6 +22,7 @@ describe('latency: kiattp vs axios vs native fetch', () => {
   });
 
   bench('native fetch()', async () => {
-    await fetch('https://api.example.com/users');
+    const res = await fetch('https://api.example.com/users');
+    await res.json();
   });
 });

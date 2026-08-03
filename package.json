@@ -30,6 +30,10 @@
     "./plugins/timeout": {
       "types": "./dist/plugins/timeout.d.ts",
       "import": "./dist/plugins/timeout.js"
+    },
+    "./plugins/devtools": {
+      "types": "./dist/plugins/devtools.d.ts",
+      "import": "./dist/plugins/devtools.js"
     }
   },
   "sideEffects": false,
