@@ -27,7 +27,12 @@ export default defineConfig([
     outDir: 'dist',
   },
   {
-    entry: { 'plugins/retry': 'src/plugins-retry.ts', 'plugins/logger': 'src/plugins-logger.ts', 'plugins/timeout': 'src/plugins-timeout.ts' },
+    entry: {
+      'plugins/retry': 'src/plugins-retry.ts',
+      'plugins/logger': 'src/plugins-logger.ts',
+      'plugins/timeout': 'src/plugins-timeout.ts',
+      'plugins/devtools': 'src/plugins-devtools.ts',
+    },
     format: ['esm'],
     dts: true,
     minify: true,
