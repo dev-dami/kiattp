@@ -7,6 +7,7 @@ import type {
   Interceptors,
   HttpMethod,
   HttpError,
+  PaginateOptions,
 } from "./types";
 import { request, globalChain } from "./core/request";
 import { InterceptorChain } from "./interceptors/chain";
@@ -56,6 +57,22 @@ export function createInstance(defaults?: Partial<Config>): Instance {
     if (plugin.onError) instanceChain.addError(plugin.onError);
   };
 
+  const paginate = async function* <T = unknown>(
+    url: string,
+    options?: PaginateOptions,
+  ): AsyncGenerator<Response<T>, void, undefined> {
+    const rel = options?.rel ?? 'next';
+    const maxPages = options?.maxPages ?? Infinity;
+    let count = 0;
+    let currentRes: Response<T> | null = await makeRequest<T>(url, options);
+    while (currentRes && count < maxPages) {
+      yield currentRes;
+      count++;
+      if (count >= maxPages) break;
+      currentRes = await currentRes.follow<T>(rel);
+    }
+  };
+
   return {
     get: methodFn("GET"),
     post: methodFn("POST"),
@@ -65,6 +82,7 @@ export function createInstance(defaults?: Partial<Config>): Instance {
     head: methodFn("HEAD"),
     options: methodFn("OPTIONS"),
     request: makeRequest,
+    paginate,
     interceptors,
     use,
   };
