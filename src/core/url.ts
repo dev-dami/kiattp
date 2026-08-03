@@ -4,16 +4,36 @@ function isAbsoluteUrl(url: string): boolean {
   return /^[a-z][a-z\d+\-.]*:/i.test(url);
 }
 
-function defaultSerializeParams(
-  params: Record<string, string | number | boolean | null | undefined>,
+function serializeParamsWithStyle(
+  params: Record<string, any>,
+  style: 'repeat' | 'brackets' | 'indices' | 'comma' = 'repeat',
 ): string {
-  const searchParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== null && value !== undefined) {
-      searchParams.append(key, String(value));
+  const parts: string[] = [];
+
+  for (const [key, val] of Object.entries(params)) {
+    if (val === null || val === undefined) continue;
+
+    if (Array.isArray(val)) {
+      if (val.length === 0) continue;
+
+      if (style === 'comma') {
+        const joined = val.filter((v) => v !== null && v !== undefined).map(String).join(',');
+        parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(joined)}`);
+      } else {
+        val.forEach((item, idx) => {
+          if (item === null || item === undefined) return;
+          let paramKey = key;
+          if (style === 'brackets') paramKey = `${key}[]`;
+          else if (style === 'indices') paramKey = `${key}[${idx}]`;
+          parts.push(`${encodeURIComponent(paramKey)}=${encodeURIComponent(String(item))}`);
+        });
+      }
+    } else {
+      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`);
     }
   }
-  return searchParams.toString().replace(/\+/g, "%20");
+
+  return parts.join('&');
 }
 
 function trimTrailingSlash(url: string): string {
@@ -38,9 +58,15 @@ export function buildUrl(
   }
 
   if (config.params && Object.keys(config.params).length > 0) {
-    const queryString = config.paramsSerializer
-      ? config.paramsSerializer(config.params)
-      : defaultSerializeParams(config.params);
+    let queryString = "";
+    if (typeof config.paramsSerializer === "function") {
+      queryString = config.paramsSerializer(config.params);
+    } else if (typeof config.paramsSerializer === "string") {
+      queryString = serializeParamsWithStyle(config.params, config.paramsSerializer);
+    } else {
+      queryString = serializeParamsWithStyle(config.params, "repeat");
+    }
+
     if (queryString) {
       url += (url.includes("?") ? "&" : "?") + queryString;
     }

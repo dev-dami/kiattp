@@ -17,16 +17,36 @@ export interface ProgressEvent {
 
 export type ProgressCallback = (progress: ProgressEvent) => void;
 
-export type AdapterName = 'fetch' | 'http';
+export interface CustomAdapterResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string | globalThis.Response | ReadableStream | unknown;
+}
+
+export type CustomAdapter = (config: Config) => Promise<CustomAdapterResponse>;
+export type AdapterName = 'fetch' | 'http' | CustomAdapter;
 
 export type TransformFn<T = unknown> = (data: T, headers: Record<string, string>) => unknown;
+
+export interface AuthConfig {
+  username: string;
+  password: string;
+}
 
 export interface ProxyConfig {
   host: string;
   port: number;
   protocol?: string;
-  auth?: { username: string; password: string };
+  auth?: AuthConfig;
 }
+
+export interface CookieJar {
+  getCookieString(url: string): string;
+  setCookie(cookieStr: string, url: string): void;
+}
+
+export type ParamsSerializerStyle = 'repeat' | 'brackets' | 'indices' | 'comma';
 
 export type BodyType =
   | string
@@ -45,8 +65,8 @@ export interface Config {
   baseURL?: string;
   url?: string;
   method?: HttpMethod;
-  params?: Record<string, string | number | boolean | null | undefined>;
-  paramsSerializer?: (params: Record<string, string | number | boolean | null | undefined>) => string;
+  params?: Record<string, any>;
+  paramsSerializer?: ParamsSerializerStyle | ((params: Record<string, any>) => string);
   headers?: Record<string, string>;
   body?: BodyType;
   timeout?: number;
@@ -55,7 +75,9 @@ export interface Config {
   validateStatus?: (status: number) => boolean;
   maxRedirects?: number;
   maxContentLength?: number;
+  auth?: AuthConfig;
   proxy?: ProxyConfig;
+  jar?: CookieJar;
   onUploadProgress?: ProgressCallback;
   onDownloadProgress?: ProgressCallback;
   transformRequest?: TransformFn[];
@@ -67,20 +89,52 @@ export interface Config {
   xsrfHeaderName?: string;
 }
 
+/** A single parsed RFC 8288 link-value. Extra target attributes are preserved. */
+export interface Link {
+  url: string;
+  rel: string;
+  [attribute: string]: string;
+}
+
+/** Parsed `Link` header, keyed by lowercased relation type. */
+export type Links = Readonly<Record<string, Link>>;
+
 export interface Response<T = unknown> {
   data: T;
   status: number;
   statusText: string;
   headers: Record<string, string>;
   config: Config;
+  /** Parsed `Link` header relations; empty object when the header is absent. */
+  links: Links;
+  /** Follow a relation, re-using this response's config. Resolves null if absent. */
+  follow<R = T>(rel: string): Promise<Response<R> | null>;
+  /** Shorthand for `follow('next')`. */
+  next<R = T>(): Promise<Response<R> | null>;
 }
 
+export type ErrorCode =
+  | 'ERR_BAD_REQUEST'
+  | 'ERR_BAD_RESPONSE'
+  | 'ERR_NETWORK'
+  | 'ERR_CANCELED'
+  | 'ERR_TIMEOUT'
+  | 'ERR_TOO_LARGE'
+  | 'ERR_TOO_MANY_REDIRECTS'
+  | 'ERR_INVALID_URL';
+
 export interface HttpError extends Error {
-  name: 'HttpError';
+  name: 'HttpError' | 'NetworkError' | 'AbortError' | 'TimeoutError';
   status?: number;
   statusText?: string;
   response?: Response;
   config: Config;
+  /** Stable machine-readable cause, independent of the message. */
+  code?: ErrorCode;
+  /** Request method, for debugging without unpacking `config`. */
+  method?: HttpMethod;
+  /** Fully-resolved request URL, for debugging without unpacking `config`. */
+  url?: string;
   isAxiosError?: boolean;
 }
 
@@ -111,6 +165,13 @@ export type RequestFn = <T = unknown>(
   config?: Omit<Config, 'url'>,
 ) => Promise<Response<T>>;
 
+export interface PaginateOptions extends Omit<Config, 'url'> {
+  /** Relation to follow between pages. Default `'next'`. */
+  rel?: string;
+  /** Stop after this many pages. Default unlimited. */
+  maxPages?: number;
+}
+
 export type Instance = {
   get: RequestFn;
   post: RequestFn;
@@ -120,6 +181,8 @@ export type Instance = {
   head: RequestFn;
   options: RequestFn;
   request: RequestFn;
+  /** Walk `Link`-header pages, yielding each response in turn. */
+  paginate: <T = unknown>(url: string, options?: PaginateOptions) => AsyncGenerator<Response<T>, void, undefined>;
   interceptors: Interceptors;
   use: (plugin: Plugin) => void;
 };

@@ -69,8 +69,29 @@ export function shouldRetry(error: HttpError): boolean {
   return retryOn.includes(error.status!);
 }
 
-export function getRetryDelay(config: Config & RetryConfig): number {
-  return calculateDelay(config._retry.attempts + 1, config._retry.backoff);
+export function parseRetryAfterHeader(headerVal?: string): number | null {
+  if (!headerVal) return null;
+  const num = Number(headerVal);
+  if (!isNaN(num) && num >= 0) {
+    return Math.round(num * 1000);
+  }
+  const dateMs = Date.parse(headerVal);
+  if (!isNaN(dateMs)) {
+    const diff = dateMs - Date.now();
+    return Math.max(0, diff);
+  }
+  return null;
+}
+
+export function getRetryDelay(config: Config & RetryConfig, error?: HttpError): number {
+  if (error?.response?.headers) {
+    const retryAfter = error.response.headers['retry-after'] || error.response.headers['Retry-After'];
+    const parsedMs = parseRetryAfterHeader(retryAfter);
+    if (parsedMs !== null) {
+      return parsedMs;
+    }
+  }
+  return calculateDelay(config._retry.attempts + 1, config._retry.backoff, config._retry.jitter);
 }
 
 export function incrementRetryAttempt(config: Config & RetryConfig): void {
